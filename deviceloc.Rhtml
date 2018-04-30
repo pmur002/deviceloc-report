@@ -1,0 +1,1229 @@
+<html>
+  <head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style type="text/css">
+    @media print {
+      body { }
+      p.img { text-align: center; page-break-inside: avoid }
+      img.CC { display: inline }
+    }
+    @media screen {
+      body { max-width: 800px; margin: auto }
+      p.img { text-align: center }
+      img.CC { display: inline }
+    }
+    p.date {
+      font-size: smaller;
+      margin: 0;
+    }
+    p.versionHistory {
+      color: gray
+    }
+    p.versionHistory a {
+      color: gray
+    }
+    p.ref {
+      text-indent: -2em;
+      padding-left: 2em;
+    }
+  </style>
+  </head>
+  <body>
+    <h1>Extreme Makeover:  R Graphics Edition</h1>
+    <p>
+      <span style="font-style: italic">by Paul Murrell</span>
+      <a href="http://orcid.org">
+        <img alt="" src="https://www.stat.auckland.ac.nz/~paul/ORCID/ORCiD.png" style="width: 16px; height: 16px; vertical-align: middle">
+      </a>
+      <span style="font-family: mono; font-size: small">
+        <a href="http://orcid.org/0000-0002-3224-8858">http://orcid.org/0000-0002-3224-8858</a>
+      </span>
+    </p>
+    <p class="date">
+    Version 1:
+<!--begin.rcode echo=FALSE, results="asis"
+cat(format(Sys.Date(), "%A %d %B %Y"))
+    end.rcode-->
+  </p>
+<!--begin.rcode init, echo=FALSE, message=FALSE, results="hide"
+opts_chunk$set(comment=" ", tidy=FALSE)
+options(width=100)
+  end.rcode-->
+<!--begin.rcode echo=FALSE
+    library(grid)
+  end.rcode-->
+    <hr>
+    <p><a rel="license" href="http://creativecommons.org/licenses/by/4.0/"><img class="CC" alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by/4.0/88x31.png"></a><br><span xmlns:dct="http://purl.org/dc/terms/" property="dct:title">This document</span>
+    by <span xmlns:cc="http://creativecommons.org/ns#" property="cc:attributionName">Paul
+    Murrell</span> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by/4.0/">Creative
+    Commons Attribution 4.0 International License</a>.
+  </p>
+    <hr>
+    <p>
+    This report describes a complex R graphics customisation example using
+    functions from the 'grid' and 'gridGraphics' packages and introduces two
+    new functions in 'grid': <code>deviceLoc</code> and <code>deviceDim</code>.
+  </p>
+    <div>
+      <h2>Table of Contents:</h2>
+      <ul style="list-style: none">
+        <li>
+          <a href="#intro">1. The problem</a>
+        </li>
+        <li>
+          <a href="#grid">2. Using 'grid' and 'gridGraphics'</a>
+        </li>
+        <li>
+          <a href="#problems">3. More problems</a>
+        </li>
+        <li>
+          <a href="#more">4. More 'grid' tools</a>
+        </li>
+        <li>
+          <a href="#final">5. The final problem and the final solution</a>
+        </li>
+        <li>
+          <a href="#discuss">6. Discussion</a>
+        </li>
+        <li>
+          <a href="#summary">7. Summary</a>
+        </li>
+        <li>
+          <a href="#requirements">8. Technical requirements</a>
+        </li>
+        <li>
+          <a href="#Resources">9. Resources</a>
+        </li>
+        <li>
+          <a href="#references">10. References</a>
+        </li>
+      </ul>
+    </div>
+    <h2>
+      <a name="intro">1. The problem</a>
+    </h2>
+    <p>
+    This report describes and then solves a complex graphics customisation 
+    problem in R (<a href="#R">R Core Team, 2018</a>)
+    that was proposed by Diana Kriese (personal communication).
+    The solution demonstrates a useful application of the 'gridGraphics' package
+    (<a href="#RJ-2015-012">Murrell, 2015</a>)
+    (to convert 'graphics' plots to 'grid' plots) and tools from 
+    the 'grid' package (<a href="#R:Murrell:2011">Murrell, 2011</a>), 
+    including two new utility functions:
+    <code>deviceLoc</code> and <code>deviceDim</code>.
+  </p>
+    <p>
+    The image that we want to produce is a combination of a pie chart
+    and a bar plot, with lines connecting the two plots, as shown below.  
+  </p>
+<!--begin.rcode final, echo=FALSE, message=FALSE
+## Code for "enhanced" pie chart
+source("./pie.R")
+## Fake data
+cdata <- as.data.frame(t(c(25, 75, 40, 60)))
+colnames(cdata) <- c('pie.a', 'pie.b', 'bar.b1', 'bar.b2')
+## pie data object
+pie.stats <- as.matrix(c(cdata['pie.a'],
+                         cdata['pie.b']))
+## bar data object
+bar.stats <- as.matrix(as.numeric(c(cdata['bar.b1'],
+                             cdata['bar.b2'])))
+## Function to generate the pie graph
+pie.x <- function() {
+    par(mar=rep(1, 4))
+    enhanced_pie(as.numeric(pie.stats[,1]),
+                 labels=c(paste0("A\n", pie.stats['pie.a',1], "%"),
+                          paste0("B\n", pie.stats['pie.b',1], "%")),
+                 col=c('orange', 'cadetblue'),
+                 clockwise=FALSE,
+                 border=NA, cex=1, line.length=1.1, factor=0.5,
+                 init.angle=180-(as.numeric(pie.stats['pie.a',1])/200*360),
+                 radius = 1)
+}
+plot.colors <- c('gold', 'gray60')
+# Function to generate the stacked barplot
+bar.x <- function() {
+    par(mar=c(1, 0, 1, 1))
+    bar.x <- barplot(bar.stats,
+                     col = plot.colors,
+                     border = NA,
+                     axes = FALSE)
+    ## Add percentage labels inside bars
+    text(rep(bar.x, each = nrow(bar.stats)),
+         apply(bar.stats, 2, cumsum) - bar.stats/2,
+         labels=paste0(c("B1\n","B2\n"), bar.stats, '%'),
+         cex=1,
+         col = 'black')
+}
+## Arrange the plots, converting them to grid versions as we go
+library(gridGraphics)
+## push base or outer viewport
+piebar <- function() {
+    pushViewport(
+        viewport(layout = grid.layout(1, 3,
+                                      widths = unit(c(3, .5, 1),
+                                                    c("null", "in", "null")),
+                                      heights = 3,
+                                      respect=TRUE),
+                 name='base'))
+    ## push left viewport
+    pushViewport(viewport(layout.pos.col = 1, name='lvp'))
+    grid.echo(pie.x, newpage=FALSE, prefix="pie")
+    upViewport()
+    ## push right viewport
+    pushViewport(viewport(layout.pos.col = 3, name='rvp'),
+                 viewport(height=0.7))
+    grid.echo(bar.x, newpage=FALSE, prefix="bar")
+    upViewport(2)
+    ## Everything from here on is relative to the device
+    ## (have to be aware that we may be drawing within some else's viewport)
+    upViewport(0) 
+    ## Find out where everything is
+    piegrob <- grid.grep("polygon-2", viewports=TRUE, grep=TRUE)
+    pievp <- attr(piegrob, "vpPath")
+    bargrob <- grid.grep("bar.*rect", viewports=TRUE, grep=TRUE)
+    barvp <- attr(bargrob, "vpPath")
+    ## Add lines
+    depth <- downViewport(pievp)
+    pg <- grid.get(piegrob)
+    ## Centre point of pie is LAST location in polygon points
+    piepts <- grid:::deviceLoc(pg$x, pg$y, valueOnly=TRUE)
+    upViewport(depth)
+    depth <- downViewport(barvp)
+    barloc <- grid:::deviceLoc(grobX(bargrob, 180), grobY(bargrob, 90),
+                               valueOnly=TRUE)
+    bardim <- grid:::deviceDim(grobWidth(bargrob), grobHeight(bargrob),
+                               valueOnly=TRUE)
+    upViewport(depth)
+    cx <- rev(piepts$x)[1]
+    cy <- rev(piepts$y)[1]
+    r <- max(piepts$x) - cx
+    bx <- barloc$x
+    h <- bardim$h/2
+    w <- bardim$w
+    by <- barloc$y - h
+    alpha <- bx - cx
+    theta <- atan2(h, alpha)
+    beta <- h/sin(theta)
+    gamma <- acos(r/beta)
+    angle <- theta + gamma
+    dx <- r*cos(angle)
+    dy <- r*sin(angle)
+    grid.segments(cx + dx, cy + dy, bx, by + h, default.units="in",
+                  name="upper-tangent")
+    grid.segments(cx + dx, cy - dy, bx, by - h, default.units="in",
+                  name="lower-tangent")
+    ## Return diag() function that can draw diagram of plot
+    invisible(function(clue=FALSE) {
+        grid.circle(cx, cy, r=r, default.units="in",
+        gp=gpar(col=NA, fill="grey"))
+        grid.rect(bx, by, width=w, height=h*2, default.units="in",
+        just="left", gp=gpar(col=NA, fill="grey"))
+        grid.circle(cx, cy, default.units="in", r=unit(1, "mm"), 
+        gp=gpar(fill="black"))
+        grid.text(expression(c[list(x,y)]), 
+        unit(cx, "in") - unit(4, "mm"),
+        unit(cy, "in") - unit(2, "mm"),
+        just=c("left", "top"))
+        grid.circle(bx, by, default.units="in", r=unit(1, "mm"), 
+        gp=gpar(fill="black"))
+        grid.text(expression(b[list(x,y)]), 
+        unit(bx, "in") + unit(2, "mm"),
+        unit(by, "in") - unit(2, "mm"),
+        just=c("left", "top"))
+        grid.segments(cx, cy, bx, by, default.units="in", gp=gpar(lty="dashed"))
+        if (clue) {
+        grid.segments(cx, cy, bx, by + h, default.units="in",
+        gp=gpar(lty="dashed"))
+        }
+        grid.segments(cx, cy, cx + dx, cy + dy, default.units="in", gp=gpar(lwd=2))
+        grid.text("r", 
+        unit(cx + dx/2, "in") - unit(2, "mm"), 
+        unit(cy + dy/2, "in"),
+        just="right")
+        grid.segments(bx, cy, bx, by + h, default.units="in", gp=gpar(lwd=2))
+        grid.text("h", 
+        unit(bx, "in") + unit(2, "mm"),
+        unit(by + h/2, "in"),
+        just="left")
+        grid.circle(cx + dx, cy + dy, default.units="in", r=unit(1, "mm"), 
+        gp=gpar(col="red", fill="red"))
+        if (clue) {
+        grid.segments(cx, cy, cx + dx, cy + dy, default.units="in",
+        gp=gpar(lty="dashed"))
+        }
+        grid.segments(cx + dx, cy + dy, bx, by + h, default.units="in",
+        gp=gpar(lwd=2, col="red"))
+        t <- seq(0, theta, length=50)
+        grid.lines(cx + 1*cos(t), cy + 1*sin(t), default.units="in", 
+        gp=gpar(lwd=2))
+        grid.text(expression(alpha), cx + .6*cos(t[25]), cy + .6*sin(t[25]),
+        default.units="in")
+        t <- seq(theta, theta + gamma, length=50)
+        grid.lines(cx + .8*cos(t), cy + .8*sin(t), default.units="in", 
+        gp=gpar(lwd=2))
+        grid.text(expression(beta), cx + .5*cos(t[25]), cy + .5*sin(t[25]),
+        default.units="in")
+    })
+}
+  end.rcode-->
+<!--begin.rcode echo=FALSE, results="hide", message=FALSE
+svg("final.svg", height=5)
+diag <- piebar()
+dev.off()
+  end.rcode-->
+    <p>
+      <img src="final.svg">
+    </p>
+    <p>
+    The most difficult
+    part of this image is drawing the two lines that run from the corners of 
+    the bar plot and are tangent to the circumference of the pie chart. 
+  </p>
+    <p>
+    On one hand, the solution just requires a little bit of trigonometry,
+    as shown in the diagram below.  Given the location of the left edge
+    of the bar plot (b<sub>x, y</sub>), 
+    (half) the height of the bar plot (h), the centre of the
+    pie chart (c<sub>x, y</sub>), and the radius of the pie chart (r), 
+    we have two 
+    right-angle triangles (one right-angle at b<sub>x, y</sub> and the
+    other at the red dot on the circumference of the circle).  These
+    triangles allow us to calculate the angles α and β, and the
+    sum of those
+    angles, along with the pie chart radius, allow us to calculate the offset
+    of the red dot from the centre of the pie chart.
+  </p>
+<!--begin.rcode echo=FALSE, results="hide"
+svg("diag.svg", height=5)
+diag(TRUE)
+dev.off()
+  end.rcode-->
+    <p>
+      <img src="diag.svg">
+    </p>
+    <p>
+    On the other hand, the solution is quite challenging because
+    it is not straightforward to determine the locations and
+    dimensions of the pie chart and the bar plot - the essential values
+    that we need to
+    perform those trigonometric calculations.
+  </p>
+    <p>
+    The problem is made more challenging by the fact that the
+    pie chart and the bar plot are drawn by calling someone else's
+    code.  The bar plot is produced by calling the 
+    <code>barplot</code> function from the 'graphics' package and the
+    pie chart is drawn by calling functions from the 'plotrix' package.
+    One consequence of this fact is that we do not know exactly how,
+    including exactly where, the pie chart and the bar plot have been drawn.
+    We have made use of the convenience of calling existing functions
+    so that we do not have to perform a lot of calculations ourselves
+    to position and size the polygons and rectangles and text that 
+    make up the pie chart and the bar plot, but this comes at the cost
+    of not knowing exactly where all of those polygons and rectangles
+    and text have been placed.
+  </p>
+    <p>
+    This problem is compounded by the fact that the functions that
+    we are calling are based on the 'graphics' package (the "base" graphics
+    system in R) and that means it is much harder to find out where
+    everything has been drawn.  To make this idea more concrete, 
+    the following code just draws the bar plot by itself (the result
+    is shown below the code).
+  </p>
+<!--begin.rcode barplot, fig.width=2, fig.height=4
+bar.x <- barplot(bar.stats, col = plot.colors, border = NA, axes = FALSE)
+  end.rcode-->
+    <p>
+    A nice feature of the base graphics system is that, after drawing a plot,
+    the coordinate system of the plot is available to add further output.
+    Unfortunately, the <code>barplot</code> function has a complicated
+    algorithm for determing its coordinate system so the result is 
+    not very intuitive.
+    For example, the following code asks for the coordinate system
+    from the barplot (the first two values are the limits of the
+    x-axis scale).
+    It is not obvious how to determine where the left edge of the
+    bar is based on that coordinate system.
+  </p>
+<!--begin.rcode parusr, eval=FALSE
+par("usr")
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.keep="none"
+<<barplot>>
+<<parusr>>
+  end.rcode-->
+    <p>
+    The <code>barplot</code> function does return some useful information
+    about the locations of its bars;  the value that we assigned
+    to <code>bar.x</code> is the mid-points of the bars.  We can use that
+    to do things like label the bars, as in the following code.
+  </p>
+<!--begin.rcode barplot.text, eval=FALSE
+text(rep(bar.x, each = nrow(bar.stats)),
+     apply(bar.stats, 2, cumsum) - bar.stats/2,
+     labels=paste0(c("B1\n","B2\n"), bar.stats, '%'),
+     cex=1, col = 'black')
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.width=2, fig.height=4
+<<barplot>>
+<<barplot.text>>
+  end.rcode-->
+    <p>
+    However, for the problem that we are addressing, we need more
+    information about what has been drawn.
+  </p>
+    <h2>
+      <a name="grid">2. Using 'grid' and 'gridGraphics'</a>
+    </h2>
+    <p>
+    The 'grid' package provides more tools for querying the locations
+    and sizes of what has been
+    drawn and the 'gridGraphics' package can turn a 'graphics' plot
+    into a 'grid' one.  The following code does this for the simple
+    bar plot by calling the <code>grid.echo</code> function from 
+    the 'gridGraphics' package.
+  </p>
+<!--begin.rcode grid.echo, eval=FALSE
+library(gridGraphics)
+grid.echo()
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.width=2, fig.height=4, fig.keep="last"
+<<barplot>>
+<<grid.echo>>
+  end.rcode-->
+    <p>
+    The output is the same as the original bar plot, 
+    but we now have 'grid' grobs to play with. The <code>grid.ls</code>
+    function from 'grid' lists all grobs in the current scene.
+    In this case, there is a single grob called
+    <code>"bar-plot-1-rect-1"</code> that represents the two
+    rectangles drawn in the bar plot.
+  </p>
+<!--begin.rcode grid.ls, eval=FALSE
+library(grid)
+grid.ls()
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.keep="none"
+dev.control("enable")
+<<barplot>>
+<<grid.echo>>
+<<grid.ls>>
+  end.rcode-->
+    <p>
+    The 'grid' package also allows us to query grobs.  For example, the 
+    following code expresses a location that is on the left edge of the
+    bar plot (180 degrees counter-clockwise from the positive x-axis).
+  </p>
+<!--begin.rcode grobx
+grobX("bar-plot-1-rect-1", 180)
+  end.rcode-->
+    <p>
+    That location only makes sense in the viewport that the barplot 
+    rectangle was drawn within, but <code>grid.ls</code> can also
+    show us all of the viewports in the current scene.  The output tells
+    us that the grob <code>"bar-plot-1-rect-1"</code> was drawn within a
+    viewport called <code>"bar-window-1-1"</code>.
+  </p>
+<!--begin.rcode grid.ls.full, eval=FALSE
+grid.ls(viewports=TRUE, print=grobPathListing)
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.keep="none"
+dev.control("enable")
+<<barplot>>
+<<grid.echo>>
+<<grid.ls.full>>
+  end.rcode-->
+    <p>
+    We can navigate to the correct viewport 
+    using the <code>downViewport</code> function and then calculate 
+    exactly the location of the edge of the bar plot rectangle.
+    The following code uses this idea to draw a small circle in the middle
+    of the left
+    edge of the bar plot.
+  </p>
+<!--begin.rcode downvp, eval=FALSE
+downViewport("bar-window-1-1")
+grid.circle(grobX("bar-plot-1-rect-1", 180),
+            grobY("bar-plot-1-rect-1", 180),
+            r=unit(1, "mm"), gp=gpar(fill="black"))
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.width=2, fig.height=4, fig.keep="last"
+dev.control("enable")
+<<barplot>>
+<<grid.echo>>
+<<downvp>>
+  end.rcode-->
+    <h2>
+      <a name="problems">3. More problems</a>
+    </h2>
+    <p>
+    A further complication in this example is the fact that
+    the pie chart and the bar plot are arranged together on the page
+    using a layout.  
+    The following code defines a layout with a large square 
+    region on the left (for the pie chart) and a tall thin 
+    region on the right (for the bar plot), with a half-inch gap
+    in between the regions.
+  </p>
+<!--begin.rcode layout
+layout <- grid.layout(1, 3,
+                      widths = unit(c(3, .5, 1),
+                                    c("null", "in", "null")),
+                      heights = 3,
+                      respect=TRUE)
+  end.rcode-->
+    <p>
+    Using a layout makes it easier
+    to specify the arrangement that we want, but makes it
+    much harder to tell
+    exactly where the plots will finally end up.
+    That is the point of using a layout:  we do not want to have to
+    figure out exactly where things go;  we want the layout to 
+    figure that out for us.
+  </p>
+    <p>
+    The following code uses this layout to draw the bar plot on the
+    right-hand side of the page.  First, we push a viewport with the
+    layout, then we push a viewport in column 3 of the layout, and 
+    then we push another viewport that is only 70% of the height of that
+    third column (in the output below the code, the viewports are shown
+    as grey rectangles).  
+    The next step is to define a function that draws
+    the bar plot (using functions from the 'graphics' package).  We can
+    then give that function as the first argument in 
+    a call to <code>grid.echo</code> to draw a 'grid' version of the bar plot
+    inside the current viewport.  It is important that we
+    specify <code>newpage=FALSE</code> so that <code>grid.echo</code>
+    does not start a new page.  We also provide a <code>prefix</code>
+    argument so that we can more easily identify the grobs that
+    are created when the bar plot is drawn.
+  </p>
+<!--begin.rcode layoutbarplot, eval=FALSE
+pushViewport(viewport(layout=layout, name="base"))
+pushViewport(viewport(layout.pos.col=3, name="rvp"),
+             viewport(height=0.7, name="barvp"))
+bar.x <- function() {
+    par(mar=rep(1, 4))
+    bar.x <- barplot(bar.stats,
+                     col = plot.colors,
+                     border = NA,
+                     axes = FALSE)
+    text(rep(bar.x, each = nrow(bar.stats)),
+         apply(bar.stats, 2, cumsum) - bar.stats/2,
+         labels=paste0(c("B1\n","B2\n"), bar.stats, '%'),
+         cex=1,
+         col = 'black')
+}
+grid.echo(bar.x, newpage=FALSE, prefix="bar")
+upViewport(3)
+  end.rcode-->
+<!--begin.rcode barviewports, echo=FALSE
+<<layoutbarplot>>
+downViewport("base")
+pushViewport(viewport(layout.pos.col=1:3))
+grid.rect(gp=gpar(col="grey", fill=NA, lwd=3))
+upViewport()
+downViewport("rvp")
+grid.rect(gp=gpar(col="grey", fill=NA, lwd=3))
+downViewport("barvp")
+grid.rect(gp=gpar(col="grey", fill=NA, lwd=3))
+upViewport(3)
+  end.rcode-->
+    <p>
+    We can do something very similar to draw the pie chart within the
+    large square region on the left side of the layout.
+  </p>
+<!--begin.rcode layoutpie, eval=FALSE
+pie.x <- function() {
+    par(mar=rep(1, 4))
+    enhanced_pie(as.numeric(pie.stats[,1]),
+                 labels=c(paste0("A\n", pie.stats['pie.a',1], "%"),
+                          paste0("B\n", pie.stats['pie.b',1], "%")),
+                 col=c('orange', 'cadetblue'),
+                 clockwise=FALSE,
+                 border=NA, cex=1, line.length=1.1, factor=0.5,
+                 init.angle=180-(as.numeric(pie.stats['pie.a',1])/200*360),
+                 radius = 1)
+}
+downViewport("base")
+pushViewport(viewport(layout.pos.col = 1, name='lvp'))
+grid.echo(pie.x, newpage=FALSE, prefix="pie")
+upViewport(2)
+  end.rcode-->
+<!--begin.rcode pieviewports, echo=FALSE
+<<barviewports>>
+<<layoutpie>>
+downViewport("base")
+downViewport("lvp")
+grid.rect(gp=gpar(col="grey", fill=NA, lwd=3))
+upViewport(2)
+  end.rcode-->
+    <p>
+    The problem is the same as before: we want to find out where the
+    edge of the bar plot is and where the centre of the circle is.  
+    It is just much more complicated now because there are more viewports
+    and grobs in the scene.
+  </p>
+<!--begin.rcode eval=FALSE
+<<grid.ls.full>>
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.keep="none"
+<<layoutbarplot>>
+<<layoutpie>>
+<<grid.ls.full>>
+  end.rcode-->
+    <h2>
+      <a name="more">4. More 'grid' tools</a>
+    </h2>
+    <p>
+    When scenes become more complicated with lots of grobs and 
+    lots of viewports, the <code>grid.grep</code> function 
+    can be useful to search for grobs and viewports by name.
+    For example, in this case, we know we want a rectangle for the 
+    bar plot, so we can try code like the following.  The argument
+    <code>grep=TRUE</code> means that <code>grid.grep</code> will
+    treat its first argument as a regular expression.  The argument
+    <code>viewports=TRUE</code> means that we will search for 
+    viewports as well as grobs.
+  </p>
+<!--begin.rcode grid.grep, eval=FALSE
+bargrob <- grid.grep("rect", grep=TRUE, viewports=TRUE)    
+bargrob
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.keep="none"
+<<layoutbarplot>>
+<<layoutpie>>
+<<grid.grep>>
+  end.rcode-->
+    <p>
+    Including viewports in the search has the benefit that any grob
+    matches also have their viewport path returned as an attribute,
+    as shown below.  This means that we know the name of the grob
+    that we want and the name of the viewport that the grob was
+    drawn within.
+  </p>
+<!--begin.rcode grobvp, eval=FALSE
+barvp <- attr(bargrob, "vpPath")
+barvp
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.keep="none"
+<<layoutbarplot>>
+<<layoutpie>>
+<<grobvp>>
+  end.rcode-->
+    <p>
+    This programmatic approach is also better for capturing
+    the steps involved in the calculations so that we can record
+    and reuse them in the future.
+  </p>
+    <p>
+With this information, we can again find the left edge of the bar plot
+exactly.  The following code does this and draws a dot on the left 
+edge.  Notice how this code records the return value from  the
+<code>downViewport</code> function, which gives the number of viewports
+that <code>downViewport</code> descended.  This value is then 
+be given to <code>upViewport</code> to "reverse" the call to
+<code>downViewport</code> after drawing.
+  </p>
+<!--begin.rcode complexbardot, eval=FALSE
+depth <- downViewport(barvp)
+grid.circle(grobX(bargrob, 180), grobY(bargrob, 180),
+            r=unit(1, "mm"), gp=gpar(fill="black"))
+upViewport(depth)
+  end.rcode-->
+<!--begin.rcode echo=FALSE
+<<layoutbarplot>>
+<<layoutpie>>
+<<complexbardot>>
+  end.rcode-->
+    <p>
+    We can do something similar to find the centre and edge of the pie chart,
+    though a little more detective work is required.  The grob listing
+    above shows that the pie chart contains three polygons, with no
+    clear indication of which is which.  In this sort of situation, we
+    may need a little exploration to get things right.  The following
+    code uses <code>grid.edit</code> from the 'grid' package to modify the
+    border colour for the three polygons and we can see that the first
+    is the wedge on the left, the second is the wedge on the right, and 
+    the third is the complete pie.
+  </p>
+<!--begin.rcode piedebug, eval=FALSE
+grid.edit("pie-plot-1-polygon-1", gp=gpar(col="red", lwd=20))
+grid.edit("pie-plot-1-polygon-2", gp=gpar(col="blue", lwd=10))
+grid.edit("pie-plot-1-polygon-3", gp=gpar(col="green", lwd=3))
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.keep="last"
+<<layoutbarplot>>
+<<layoutpie>>
+<<piedebug>>
+  end.rcode-->
+    <p>
+    That third polygon makes it easy to calculate both the centre and
+    edge of the pie chart.  The following code places dots at the 
+    centre and right edge of the pie.
+  </p>
+<!--begin.rcode piedots, eval=FALSE
+piegrob <- grid.grep("polygon-3", grep=TRUE, viewports=TRUE)
+pievp <- attr(piegrob, "vpPath")
+depth <- downViewport(pievp)
+grid.circle(grobX(piegrob, 90), grobY(piegrob, 0),
+            r=unit(1, "mm"), gp=gpar(fill="black"))
+grid.circle(grobX(piegrob, 0), grobY(piegrob, 0),
+            r=unit(1, "mm"), gp=gpar(fill="black"))
+upViewport(depth)
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.keep="last"
+<<layoutbarplot>>
+<<layoutpie>>
+<<piedots>>
+  end.rcode-->
+    <h2>
+      <a name="final">5. The final problem and the final solution</a>
+    </h2>
+    <p>
+    Unfortunately, we are still not quite where we want to be.
+    The previous code shows that we can navigate down to the pie chart 
+    viewport and calculate the location of the pie polygon <em>within
+    that viewport</em>.  However, that does not tell us where the edge of
+    the pie
+    chart is relative to the edge of the bar plot.  For that we need
+    to know the location of the pie polygon <em>within the page</em> 
+    (and, similarly, we need the location of the bar plot rectangle
+    within the page).
+  </p>
+    <p>
+    This is where two new 'grid' functions come in.  The <code>deviceLoc</code>
+    function takes a location within a viewport and converts it 
+    to a location (in inches) relative to the device (or, equivalently,
+    the "root" viewport).  The <code>deviceDim</code> function is similar,
+    but it two arguments (and its return value) 
+    are a width/height pair rather than an x/y location.
+  </p>
+    <p>
+    The following code uses the <code>deviceLoc</code> function to 
+    calculate the centre of the pie chart and the edge of the bar rectangle
+    relative to the device
+    (and draws dots and a line between to show that it gets it right).  Notice
+    that we must first descend to the pie chart viewport
+    (because that is where the pie polygon is drawn), where we then
+    do the conversion, and then do similar for the bar rectangle, 
+    but then we must navigate back up to the device
+    to use the results for drawing (because that is where the result of 
+    <code>deviceLoc</code> makes sense).  The <code>deviceDim</code> 
+    function can be used to calculate the height of the bar rectangle.
+  </p>
+<!--begin.rcode piedotdevice, eval=FALSE
+piedepth <- downViewport(pievp)
+piecentre <- deviceLoc(grobX(piegrob, 90), grobY(piegrob, 0))
+upViewport(piedepth)
+bardepth <- downViewport(barvp)
+baredge <- deviceLoc(grobX(bargrob, 180), grobY(bargrob, 180))
+upViewport(bardepth)
+grid.circle(piecentre$x, piecentre$y,
+            r=unit(2, "mm"), gp=gpar(fill="black"))
+grid.circle(baredge$x, baredge$y,
+            r=unit(2, "mm"), gp=gpar(fill="black"))
+grid.segments(piecentre$x, piecentre$y, baredge$x, baredge$y)
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.keep="last"
+<<layoutbarplot>>
+<<layoutpie>>
+<<piedotdevice>>
+## Slight cheat because the circle centre and bar centre are not
+## QUITE horizontally aligned, but I want it to look like they are
+## because they are close enough and I do not want to get into
+## the problem here - it will disrupt my "flow"!
+grid.segments(piecentre$x, 
+              0.5*(piecentre$y + baredge$y), 
+              baredge$x, 
+              0.5*(piecentre$y + baredge$y), 
+              gp=gpar(lwd=5))
+  end.rcode-->
+    <p>
+    This finally gives us the information that we need.
+    We can calculate the centre of the pie, the radius of the pie, 
+    the left edge of the bar, and the height of the bar, all
+    as locations on the device.  That information can then be used
+    to carry out the trigonometric calculations that determine
+    the point on the edge of the circle from which we should
+    draw a line to the corner of
+    the bar.  The final result is reproduced below, along with a 
+    listing of the grobs and viewports that are involved, which show
+    that the lines from pie to bar (<code>upper-tangent</code> and 
+    <code>lower-tangent</code>) are both drawn within the "root"
+    viewport (because that is the common coordinate system within
+    which we calculated the important locations of both pie and bar).
+  </p>
+    <p>
+      <img src="final.svg">
+    </p>
+<!--begin.rcode eval=FALSE
+<<grid.ls.full>>
+  end.rcode-->
+<!--begin.rcode echo=FALSE, fig.keep="none"
+piebar()
+<<grid.ls.full>>
+  end.rcode-->
+    <h2>
+      <a name="discuss">6. Discussion</a>
+    </h2>
+    <p>
+    This report has described how to solve a specific R graphics 
+    customisation example using tools from the 'grid' and 'gridGraphics'
+    packages.  
+    As a specific example, this provides a useful demonstration of some 
+    tools in the 'grid' graphics world 
+    that may not be very well known.
+    It also demonstrates the value of 
+    converting a high-level plot
+    that was drawn using the base graphics system in R into a
+    'grid' version, to gain access to the tools within the 'grid'
+    graphics system.
+    More generally, it demonstrates that quite extreme customisations
+    are possible within the 'grid' graphics system.
+  </p>
+    <h3>The importance of code</h3>
+    <p>
+    An important feature of the solutions outlined in this report
+    is that they are code based.  One way that this sort of annotation
+    could be solved is by drawing the pie chart and the bar plot with R,
+    saving to PDF or SVG format, and then manually adding the lines
+    with an editor like 
+    <a href="https://www.adobe.com/products/illustrator.html">Adobe 
+    Illustrator</a> or Inkscape 
+    (<a href="#inkscape">The Inkscape Team, 2018</a>).
+  </p>
+    <p>
+    By performing the annotation entirely within R, we get the usual 
+    benefits of code-based solutions:  maintaining a record, 
+    easy reuse, reproducibility, sharing, etc.  In this case,
+    we also get the benefit of <em>accuracy</em>.  Any
+    manual attempt to draw the lines so that they are tangent to the
+    circumference of the pie cannot hope to guarantee accuracy in the
+    same way as a mathematical calculation in code.
+    This is also an excellent example where tiny adjustments to the 
+    image, such as shifting the relative positions of the pie chart and
+    the bar plot, will be trivially accommodated by the code solution,
+    but would rapidly induce apoplexy if manual corrections had to be repeated.
+  </p>
+    <h3>How well do device locations nest?</h3>
+    <p>
+    An important feature of the solution outlined in this report was
+    the conversion of locations and dimensions of shapes within the
+    scene to locations and dimensions in terms of inches on the device 
+    (or "root" viewport), using <code>deviceLoc</code> and 
+    <code>deviceDim</code>.  This makes the resulting drawing very absolute,
+    which, for example, means that it is only valid for the current device size.
+  </p>
+    <p>
+    This sort of absolute solution is undesirable in the 'grid' graphics
+    system because, ideally, any drawing that we do is not relative
+    to the device, but relative to the current viewport.  This is to allow
+    our drawing to be nested or embedded within other people's drawing.
+  </p>
+    <p>
+    So is it possible to use the solution outlined in this report as a 
+    sub-plot within a more complex graphic?  The answer is 
+    "yes", in at least two ways.
+  </p>
+    <p>
+    The code that does the actual drawing of
+    the pie chart and bar plot with connecting lines
+    has been encapsulated within a <code>piebar</code> function
+    so that we can experiment with different approaches.
+    To create the final graphic, we can just call that function,
+    as shown below.
+  </p>
+<!--begin.rcode 
+piebar()
+  end.rcode-->
+    <p>
+    The following code shows that we can successfully call that function within
+    another viewport.  In the resulting image, the whole page is represented
+    by a grey rectangle, and the viewport within which we are doing our
+    drawing is represented by a white rectangle.
+  </p>
+<!--begin.rcode 
+grid.newpage()
+grid.rect(gp=gpar(col=NA, fill="grey"))
+pushViewport(viewport(width=.8, height=.5))
+grid.rect(gp=gpar(col=NA, fill="white"))
+piebar()
+  end.rcode-->
+    <p>
+    Although this "just works", it is dependent on several important
+    details within the <code>piebar</code> function.
+    When we use <code>grid.grep</code> to find viewport paths to
+    grobs within the page, the viewport path that we get starts from the
+    very top-level "root" viewport.  Furthermore, once we have locations from 
+    <code>deviceLoc</code>, those locations only make sense within the
+    very top-level "root" viewport.  As a consequence, the <code>piebar</code>
+    function must use <code>upViewport(0)</code> to navigate up to the
+    "root" viewport, to account for the possibility that there are
+    viewports above those that the <code>piebar</code> itself has set up.
+    Another point to be careful about is the pattern given to 
+    <code>grid.grep</code> to search for
+    grobs by name.  If there is other drawing on the page, then there will
+    be other grobs and we will not know their names, so it is possible to
+    get name conflicts and for <code>grid.grep</code> to return
+    an unexpected result.
+  </p>
+    <p>
+    Another approach, that avoids some of the issues above,
+    is to draw the output of <code>piebar</code> on its own device
+    and then "copy" it into the current viewport.
+    This means that the <code>piebar</code> code really can assume that
+    it is the only output on the device.  This approach is possible 
+    by using the <code>grid.grabExpr</code> function, which runs an
+    expression on its own device and then captures the result as 
+    a 'grid' gTree, that can subsequently be drawn via <code>grid.draw</code>.
+    The following code demonstrates this approach.
+  </p>
+<!--begin.rcode 
+grid.newpage()
+grid.rect(gp=gpar(col=NA, fill="grey"))
+pushViewport(viewport(width=.8, height=.5))
+grid.rect(gp=gpar(col=NA, fill="white"))
+grid.draw(grid.grabExpr(expression(piebar()),
+                        width=convertWidth(unit(1, "npc"), "in", 
+                                           valueOnly=TRUE),
+                        height=convertHeight(unit(1, "npc"), "in", 
+                                             valueOnly=TRUE)))
+  end.rcode-->
+    <h3>Why not a "din" unit ?</h3>
+    <p>
+    The solution described in this report makes use of a new function
+    <code>deviceLoc</code>.  This is a function that converts from a location
+    expressed in units relative to a viewport to a location
+    in inches relative to the graphics device.  How is this different
+    from the existing <code>convertX</code> function (and its ilk)?
+  </p>
+    <p>
+    One important difference is that <code>convertX</code>
+    only converts between two different coordinate systems within the
+    <em>same viewport</em>.  A unit object is always relative to the
+    coordinate systems of the viewport that it is evaluated within.
+    For example, <code>unit(.5, "npc")</code> mean half way across
+    (or half way up) the current viewport.  With <code>convertX</code>,
+    we can convert that to
+    a number of inches across (or up) <em>the same viewport</em>, but
+    that is all.  By comparison, <code>convertLoc</code> converts from
+    the coordinate systems of the current viewport to a location in inches
+    within <em>the "root" viewport</em>.  So <code>convertX</code>
+    converts within the same viewport and <code>convertLoc</code>
+    converts between different viewports.
+  </p>
+    <p>
+    A second difference is that <code>convertX</code> only converts a
+    value relative to the x-dimension coordinates.  It ignores the
+    y-dimension coordinates.  This is possible because all units are 
+    relative to the current viewport and the current viewport is 
+    always rectangular and the current viewport only has cartesian
+    coordinate systems.
+    By comparison, the <code>convertLoc</code> function converts a
+    <em>location</em> - a pair of x/y units.  This is because it is possible
+    for a viewport to be rotated.  For example, consider the image below,
+    which shows a device (grey rectangle) with a rotated viewport (white 
+    rectangle).  The dashed line represents constant x-values within the 
+    viewport and it is clear
+    that we cannot convert an x-value within the viewport 
+    on its own to an x-value on the 
+    device;  we also need to know a y-value within the viewport
+    (e.g., the dot within the diagram below) in order to 
+    convert an x/y location within the viewport to an x/y location
+    on the device.
+  </p>
+<!--begin.rcode echo=FALSE, fig.width=3, fig.height=3
+grid.newpage()
+grid.rect(gp=gpar(col=NA, fill="grey"))
+pushViewport(viewport(width=.5, height=.5, angle=30))
+grid.rect(gp=gpar(col=NA, fill="white"))
+grid.segments(.3, 0, .3, 1, gp=gpar(lty="dashed"))
+grid.circle(.3, .7, r=unit(1, "mm"), gp=gpar(fill="black"))
+  end.rcode-->
+    <p>
+    Because of those differences, it is not possible to add a general-purpose
+    "din" (device inches) unit to 'grid'.  
+  </p>
+    <h3>Is there a better way?</h3>
+    <p>
+    For this particular example, an alternative approach would be to
+    draw the pie chart and the bar plot ourselves with 
+    direct 'grid' calls, 
+    e.g., <code>grid.polygon</code> and <code>grid.rect</code>,
+    rather than relying on calls to high-level
+    'graphics' functions.  That would possibly simplify the problem
+    because we could have greater control over the placement of the
+    pie and the bar.
+    However, this would not always be the case.
+    For example, if we were combining output from a more complex 
+    'graphics' function, such as the 
+    <code>plot.dendrogram</code> function, it would be much harder to 
+    replace the high-level function call with our own direct calls to
+    'grid' functions.
+    The scenario considered in this report represents a general
+    class of graphics problems where we want the convenience
+    of using someone else's high-level plotting functions combined with the
+    ability to query and revisit the low-level details of what those
+    functions drew.
+  </p>
+    <p>
+    Another possibility to consider is producing the image with something 
+    other than R.  
+    What makes this sort of customisation possible in R is that there
+    are high-level graphics packages like 'lattice' and 'ggplot2' 
+    (plus 'graphics' via 'gridGraphics') for
+    drawing complete plots, but they do their drawing using
+    a lower-level graphics system, 'grid', that records the graphical
+    objects and coordinate systems and provides tools for modifying
+    and querying and revisiting those lower-level details of the complete
+    plot.
+    Two non-R graphics systems that bear some resemblance
+    to this arrangement are, within the TeX world,
+    the PGF/TikZ package (<a href="#tantau:2015">Tantau, 2015</a>) with
+    PGFPLOTS (<a href="#pgfplots">Feuersanger, 2012</a>) built on top and, 
+    within the Javascript world, the
+    D3.js library (<a href="#2011-d3">Bostock et al., 2011</a>) 
+    (and plotting systems built on top of it, like C3.js) (<a href="c3js"></a>).
+  </p>
+    <p>
+    The similarity in the case of D3 lies in the fact that it 
+    provides a higher level interface for generating HTML and
+    SVG (and CSS) images,
+    but the image that it produces is pure HTML and SVG (and CSS).  
+    This means that it is possible to use low-level DOM (Document Object Model)
+    tools to customise an image that was created by D3.
+    For example, the following javascript code uses the C3.js library
+    (which uses D3.js)
+    to create a simple stacked barplot.
+  </p>
+<!--begin.rcode echo=FALSE
+cat(readLines("D3js/c3.js"), sep="\n")
+  end.rcode-->
+    <p>
+    The next javascript code is raw javascript that determines the
+    location of the bars that the C3.js library drew and adds
+    a black dot on the left edge.
+  </p>
+<!--begin.rcode echo=FALSE
+cat(readLines("D3js/svg.js"), sep="\n")
+  end.rcode-->
+    <iframe id="d3" src="D3js/piebar.html" width="120" height="220" style="border: none">
+  </iframe>
+    <p>
+    PGF/TikZ is a very powerful and flexible low-level graphics system;
+    PGFPLOTS provides a high-level interface for producing plots with
+    PGF/TikZ, but
+    the result can be manipulated using PGF/TikZ itself.
+    For example, the following LaTeX code uses PGFPLOTS to draw a simple
+    stacked barplot (the <code>axis</code> environment and the 
+    <code>\addplot</code> commands), but then adds a black dot using a
+    low-level PGF/TikZ <code>node</code>, with the location of the node
+    being calculated by querying the PGFPLOTS system
+    (<code>/pgfplots/xmin</code>).
+  </p>
+<!--begin.rcode echo=FALSE
+cat(readLines("PGFTikZ/piebar.tex"), sep="\n")
+  end.rcode-->
+    <img src="PGFTikZ/piebar.png">
+    <p>
+    In comparison to both cases, 'grid' (plus 'lattice' or 'ggplot2' or 
+    'graphics'/'gridGraphics') is unusual and possibly unique in
+    its explicit support for revisiting coordinate systems and
+    providing transformations between coordinate systems.
+    Also, with 'grid' being in the R world, there are many more tools
+    for data processing and calculations.  
+  </p>
+    <h2>
+      <a name="summary">7. Summary</a>
+    </h2>
+    <p>
+    This report describes a complex R graphics customisation with the
+    following important features:  two 'graphics' based plots are 
+    combined together on the same page, then further drawing is added 
+    that spans the coordinate systems of both plots.
+  </p>
+    <p>
+    The solution consists of the following steps:
+    convert the 'graphics' plots to 'grid' plots using 
+    <code>grid.echo</code> from the 'gridGraphics' package;
+    use 'grid' functions <code>grid.ls</code> and 
+    <code>grid.grep</code> to determine the names of important
+    grobs and the names of the viewports that they are drawn within;
+    navigate down to those viewports and use 
+    <code>grobX</code>, <code>grobY</code>, and a new function
+    <code>deviceLoc</code> to calculate important locations within each
+    plot in terms of inches on the graphics device;
+    navigate back up to the "root" viewport to draw the annotations
+    that span both plots based on the locations in terms of inches
+    on the graphics device.
+  </p>
+    <h2>
+      <a name="requirements">8. Technical requirements</a>
+    </h2>
+    <p>
+    The examples and discussion in this document are mostly relevant
+    to any recent R version (e.g., anything in the 3.* series).
+    The functions <code>deviceLoc</code> and <code>deviceDim</code>
+    are only available in the 
+    development version of R, which will become R version 3.6.0.
+  </p>
+    <p>
+    This report was generated within a Docker container
+    (see <a href="#Resources">Resources</a> section below).
+  </p>
+    <h2>
+      <a name="Resources">9. Resources</a>
+    </h2>
+    <ul>
+      <li>
+      The <a href="deviceloc.cml">raw source file</a> for this
+      report, a <a href="deviceloc.xml">valid XML</a>
+      transformation of the source file, a <a href="deviceloc.Rhtml">'knitr' document</a> generated from
+      the XML file, 
+      two <a href="toc.R">R</a> <a href="bib.R">files</a> and
+      the <a href="deviceloc.bib">bibtex file</a>
+      that are used to generate the table of contents and reference sections,
+      two <a href="common.xsl">XSL</a> <a href="knitr.xsl">files</a> that are used to transform the XML to
+      the 'knitr' document, and a <a href="Makefile">Makefile</a> that
+      contains code for the other transformations and coordinates
+      everything.  
+      These materials are also available
+      on <a href="https://github.com/pmur002/deviceloc-report/releases/tag/v1">github</a>.
+    </li>
+      <li>
+      The file <a href="pie.R">pie.R</a> from Diana Kriese
+      that contains R code to
+      draw an "enhanced" pie chart.
+    </li>
+      <li>
+      This report was generated within a 
+      <a href="https://www.docker.com/">Docker</a> container.
+      The Docker command to build the report is included in the Makefile above.
+      The Docker image for the container is available from
+      <a href="https://hub.docker.com/r/pmur002/deviceloc-intro/">Docker Hub</a>;
+      alternatively, the image can be rebuilt from its 
+      <a href="Dockerfile">Dockerfile</a>.
+    </li>
+    </ul>
+    <h2>How to cite this document</h2>
+    <p>
+    Murrell, P. (2018). "Extreme Makeover:  R Graphics Edition." 
+    Technical Report 2018-??, Department of Statistics, The University of Auckland. 
+    [ <a href="how-to-cite.bib">bib</a> ] 
+  </p>
+    <h2>
+      <a name="references">10. References</a>
+    </h2>
+    <dl>
+<dt>
+[<a name="2011-d3">Bostock et al., 2011</a>]
+</dt>
+<dd>
+Bostock, M., Ogievetsky, V., and Heer, J. (2011).
+ D3: Data-driven documents.
+ <em>IEEE Trans. Visualization &amp; Comp. Graphics (Proc. InfoVis)</em>.
+[ <a href="deviceloc-bib_bib.html#2011-d3">bib</a> | 
+<a href="http://vis.stanford.edu/papers/d3">http</a> ]
+
+</dd>
+
+
+<dt>
+[<a name="pgfplots">Feuersanger, 2012</a>]
+</dt>
+<dd>
+Feuersanger, C. (2012).
+ <em>Manual for Package pgfplots</em>.
+[ <a href="deviceloc-bib_bib.html#pgfplots">bib</a> | 
+<a href="http://pgfplots.sourceforge.net/pgfplots_layers.pdf">.pdf</a> ]
+
+</dd>
+
+
+<dt>
+[<a name="R:Murrell:2011">Murrell, 2011</a>]
+</dt>
+<dd>
+Murrell, P. (2011).
+ <em>R Graphics, Second Edition</em>.
+ Chapman &amp; Hall/CRC the R series. Chapman &amp; Hall/CRC Press, Boca
+  Raton, FL.
+[ <a href="deviceloc-bib_bib.html#R:Murrell:2011">bib</a> | 
+<a href="http://www.crcpress.com/product/isbn/9781439831762">http</a> ]
+
+</dd>
+
+
+<dt>
+[<a name="RJ-2015-012">Murrell, 2015</a>]
+</dt>
+<dd>
+Murrell, P. (2015).
+ The gridGraphics Package.
+ <em>The R Journal</em>, 7(1):151--162.
+[ <a href="deviceloc-bib_bib.html#RJ-2015-012">bib</a> | 
+<a href="https://journal.r-project.org/archive/2015/RJ-2015-012/index.html">.html</a> ]
+
+</dd>
+
+
+<dt>
+[<a name="R">R Core Team, 2018</a>]
+</dt>
+<dd>
+R Core Team (2018).
+ <em>R: A Language and Environment for Statistical Computing</em>.
+ R Foundation for Statistical Computing, Vienna, Austria.
+[ <a href="deviceloc-bib_bib.html#R">bib</a> | 
+<a href="https://www.R-project.org/">http</a> ]
+
+</dd>
+
+
+<dt>
+[<a name="c3js">Tanaka, 2018</a>]
+</dt>
+<dd>
+Tanaka, M. (2018).
+ c3: A D3-based reusable chart library.
+[ <a href="deviceloc-bib_bib.html#c3js">bib</a> | 
+<a href="https://github.com/c3js/c3">http</a> ]
+
+</dd>
+
+
+<dt>
+[<a name="tantau:2015">Tantau, 2015</a>]
+</dt>
+<dd>
+Tantau, T. (2015).
+ <em>The TikZ and PGF Packages</em>.
+[ <a href="deviceloc-bib_bib.html#tantau:2015">bib</a> | 
+<a href="https://sourceforge.net/projects/pgf/">http</a> ]
+
+</dd>
+
+
+<dt>
+[<a name="inkscape">The Inkscape Team, 2018</a>]
+</dt>
+<dd>
+The Inkscape Team (2018).
+ Inkscape.
+[ <a href="deviceloc-bib_bib.html#inkscape">bib</a> | 
+<a href="http://www.inkscape.org/">http</a> ]
+
+</dd>
+</dl>
+    <hr>
+    <p><a rel="license" href="http://creativecommons.org/licenses/by/4.0/"><img class="CC" alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by/4.0/88x31.png"></a><br><span xmlns:dct="http://purl.org/dc/terms/" property="dct:title">This document</span>
+    by <span xmlns:cc="http://creativecommons.org/ns#" property="cc:attributionName">Paul
+    Murrell</span> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by/4.0/">Creative
+    Commons Attribution 4.0 International License</a>.
+  </p>
+  </body>
+</html>

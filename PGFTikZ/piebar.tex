@@ -1,0 +1,15 @@
+\documentclass[margin=2mm]{standalone}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.13}
+\begin{document}
+\begin{tikzpicture}
+\begin{axis}[ width=1in, height=2in, clip=false,
+    ybar stacked, ymin=0, ymax=1, xmin=-1, xmax=1,
+    enlarge x limits=0, bar width=2, axis lines=none ]
+  \addplot coordinates {(0, 0.4)} 
+     node [shape=circle,draw=black,fill=black,inner sep=0,minimum size=2mm] 
+       at (\pgfkeysvalueof{/pgfplots/xmin}, .5) {};
+  \addplot coordinates {(0, 0.6)};
+\end{axis}
+\end{tikzpicture}
+\end{document}
