@@ -550,7 +550,7 @@ be given to <code>upViewport</code> to "reverse" the call to
     function takes a location within a viewport and converts it 
     to a location (in inches) relative to the device (or, equivalently,
     the "root" viewport).  The <code>deviceDim</code> function is similar,
-    but it two arguments (and its return value) 
+    but its two arguments (and its return value) 
     are a width/height pair rather than an x/y location.
   </p>
     <p>
@@ -584,7 +584,8 @@ be given to <code>upViewport</code> to "reverse" the call to
     This finally gives us the information that we need.
     We can calculate the centre of the pie, the radius of the pie, 
     the left edge of the bar, and the height of the bar, all
-    as locations on the device.  That information can then be used
+    as locations and dimensions 
+    on the device.  That information can then be used
     to carry out the trigonometric calculations that determine
     the point on the edge of the circle from which we should
     draw a line to the corner of
@@ -825,7 +826,7 @@ be given to <code>upViewport</code> to "reverse" the call to
     PGFPLOTS (<a href="#pgfplots">Feuersanger, 2012</a>) built on top and, 
     within the Javascript world, the
     D3.js library (<a href="#2011-d3">Bostock et al., 2011</a>) 
-    (and plotting systems built on top of it, like C3.js) (<a href="c3js"></a>).
+    and plotting systems built on top of it, like C3.js (<a href="#c3js">Tanaka, 2018</a>).
   </p>
     <p>
     The similarity in the case of D3 lies in the fact that it 
@@ -836,7 +837,7 @@ be given to <code>upViewport</code> to "reverse" the call to
     tools to customise an image that was created by D3.
     For example, the following javascript code uses the C3.js library
     (which uses D3.js)
-    to create a simple stacked barplot.
+    to create a simple stacked barplot from a high-level description.
   </p>
 <div class="chunk" id="unnamed-chunk-25"><div class="rcode"><div class="output"><pre class="knitr r">  var chart = c3.generate({
       bindto: '#chart',
@@ -855,7 +856,8 @@ be given to <code>upViewport</code> to "reverse" the call to
 </pre></div>
 </div></div>
     <p>
-    The next javascript code is raw javascript that determines the
+    The next javascript code uses low-level DOM tools 
+    to determine the
     location of the bars that the C3.js library drew and adds
     a black dot on the left edge.
   </p>
@@ -872,7 +874,7 @@ be given to <code>upViewport</code> to "reverse" the call to
     <iframe id="d3" src="D3js/piebar.html" width="120" height="220" style="border: none">
   </iframe>
     <p>
-    PGF/TikZ is a very powerful and flexible low-level graphics system;
+    PGF/TikZ is a very powerful and flexible low-level graphics system and
     PGFPLOTS provides a high-level interface for producing plots with
     PGF/TikZ, but
     the result can be manipulated using PGF/TikZ itself.
@@ -939,9 +941,10 @@ be given to <code>upViewport</code> to "reverse" the call to
     <p>
     The examples and discussion in this document are mostly relevant
     to any recent R version (e.g., anything in the 3.* series).
-    The functions <code>deviceLoc</code> and <code>deviceDim</code>
+    However, the functions <code>deviceLoc</code> and <code>deviceDim</code>
     are only available in the 
-    development version of R, which will become R version 3.6.0.
+    development version of R (revision r74634), 
+    which will become R version 3.6.0.
   </p>
     <p>
     This report was generated within a Docker container
@@ -959,7 +962,8 @@ be given to <code>upViewport</code> to "reverse" the call to
       two <a href="toc.R">R</a> <a href="bib.R">files</a> and
       the <a href="deviceloc.bib">bibtex file</a>
       that are used to generate the table of contents and reference sections,
-      two <a href="common.xsl">XSL</a> <a href="knitr.xsl">files</a> that are used to transform the XML to
+      two <a href="common.xsl">XSL</a> <a href="knitr.xsl">files</a> and an 
+      <a href="knit.R">R file</a> that are used to transform the XML to
       the 'knitr' document, and a <a href="Makefile">Makefile</a> that
       contains code for the other transformations and coordinates
       everything.  
@@ -976,7 +980,7 @@ be given to <code>upViewport</code> to "reverse" the call to
       <a href="https://www.docker.com/">Docker</a> container.
       The Docker command to build the report is included in the Makefile above.
       The Docker image for the container is available from
-      <a href="https://hub.docker.com/r/pmur002/deviceloc-intro/">Docker Hub</a>;
+      <a href="https://hub.docker.com/r/pmur002/deviceloc/">Docker Hub</a>;
       alternatively, the image can be rebuilt from its 
       <a href="Dockerfile">Dockerfile</a>.
     </li>
