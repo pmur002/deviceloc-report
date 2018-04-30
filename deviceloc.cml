@@ -1087,7 +1087,7 @@ cat(readLines("PGFTikZ/piebar.tex"), sep="\n")
   <h2>How to cite this document</h2>
   <p>
     Murrell, P. (2018). "Extreme Makeover:  R Graphics Edition." 
-    Technical Report 2018-??, Department of Statistics, The University of Auckland. 
+    Technical Report 2018-04, Department of Statistics, The University of Auckland. 
     [ <a href="how-to-cite.bib">bib</a> ] 
   </p>
 
